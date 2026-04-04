@@ -1026,7 +1026,9 @@ class Game:
         self.num_players = 2
         self.map_id = 0
         self.score_limit = 15
-        self.game_time = 300 * FPS
+        self.time_options = [60, 180, 300, 600] # 1, 3, 5, 10 minutes
+        self.time_idx = 2 # Default 5 min
+        self.game_time = self.time_options[self.time_idx] * FPS
 
         self.players = {}
         self.bullets = []
@@ -1123,33 +1125,33 @@ class Game:
     def _build_menus(self):
         cx = W // 2
         self.menu_buttons = {
-            "play":     Button(cx-120, 250, 240, 52, "⚔  LOCAL PLAY", (30, 100, 200)),
-            "multi":    Button(cx-120, 318, 240, 52, "🌐  ONLINE",     (60, 40, 180)),
-            "map":      Button(cx-120, 386, 240, 52, "🗺  MAPS",       (40, 80, 140)),
-            "players":  Button(cx-120, 454, 240, 52, "👥  PLAYERS",    (40, 80, 140)),
-            "settings": Button(cx-120, 522, 240, 52, "⚙  SETTINGS",   (30, 50, 80)),
-            "quit":     Button(cx-120, 590, 240, 52, "✕  QUIT",        (100, 30, 30)),
+            "play":     Button(cx-120, 250, 240, 52, "LOCAL PLAY", (30, 100, 200)),
+            "multi":    Button(cx-120, 318, 240, 52, "ONLINE",     (60, 40, 180)),
+            "map":      Button(cx-120, 386, 240, 52, "MAPS",       (40, 80, 140)),
+            "players":  Button(cx-120, 454, 240, 52, "PLAYERS",    (40, 80, 140)),
+            "settings": Button(cx-120, 522, 240, 52, "SETTINGS",   (30, 50, 80)),
+            "quit":     Button(cx-120, 590, 240, 52, "QUIT",        (100, 30, 30)),
         }
         self.multi_buttons = {
-            "create": Button(cx-110, 280, 220, 48, "🛰  CREATE ROOM", (30, 100, 50)),
-            "join":   Button(cx-110, 348, 220, 48, "🤝  JOIN ROOM",   (40, 60, 100)),
-            "back":   Button(cx-110, 416, 220, 48, "↩  BACK",        (100, 30, 30)),
+            "create": Button(cx-110, 280, 220, 48, "CREATE ROOM", (30, 100, 50)),
+            "join":   Button(cx-110, 348, 220, 48, "JOIN ROOM",   (40, 60, 100)),
+            "back":   Button(cx-110, 416, 220, 48, "<< BACK",    (100, 30, 30)),
         }
         self.pause_buttons = {
-            "resume": Button(cx-110, 280, 220, 48, "▶  RESUME",   (30, 100, 50)),
-            "menu":   Button(cx-110, 348, 220, 48, "⌂  MAIN MENU", (40, 60, 100)),
-            "quit":   Button(cx-110, 416, 220, 48, "✕  QUIT",      (100, 30, 30)),
+            "resume": Button(cx-110, 280, 220, 48, "RESUME",   (30, 100, 50)),
+            "menu":   Button(cx-110, 348, 220, 48, "MAIN MENU", (40, 60, 100)),
+            "quit":   Button(cx-110, 416, 220, 48, "QUIT",      (100, 30, 30)),
         }
         self.gameover_buttons = {
-            "rematch": Button(cx-110, 440, 220, 48, "↺  REMATCH",    (30, 100, 50)),
-            "menu":    Button(cx-110, 508, 220, 48, "⌂  MAIN MENU",  (40, 60, 100)),
+            "rematch": Button(cx-110, 440, 220, 48, "REMATCH",    (30, 100, 50)),
+            "menu":    Button(cx-110, 508, 220, 48, "MAIN MENU",  (40, 60, 100)),
         }
         self.map_buttons = {
-            0: Button(cx-110, 200, 220, 48, "🏙  URBAN",      (60, 80, 140)),
-            1: Button(cx-110, 260, 220, 48, "🍃  JUNGLE",     (40, 120, 60)),
-            2: Button(cx-110, 320, 220, 48, "❄  FROZEN",     (80, 160, 255)),
-            3: Button(cx-110, 380, 220, 48, "🧱  CATACOMBS",  (100, 70, 40)),
-            "back": Button(cx-110, 500, 220, 48, "↩  BACK",      (80, 80, 80)),
+            0: Button(cx-110, 200, 220, 48, "URBAN",      (60, 80, 140)),
+            1: Button(cx-110, 260, 220, 48, "JUNGLE",     (40, 120, 60)),
+            2: Button(cx-110, 320, 220, 48, "FROZEN",     (80, 160, 255)),
+            3: Button(cx-110, 380, 220, 48, "CATACOMBS",  (100, 70, 40)),
+            "back": Button(cx-110, 500, 220, 48, "<< BACK",      (80, 80, 80)),
         }
 
     def start_game(self):
@@ -1703,7 +1705,7 @@ class Game:
     def draw_gameover(self):
         overlay = pygame.Surface((W, H), pygame.SRCALPHA)
         overlay.fill((10, 15, 30, 220))
-        self.screen.blit(overlay)
+        self.screen.blit(overlay, (0, 0))
         
         t = BIG_FONT.render("BATTLE ENDED", True, C["white"])
         self.screen.blit(t, (W//2 - t.get_width()//2, 100))
@@ -1714,11 +1716,15 @@ class Game:
         for rank, pid in enumerate(sorted_pids):
             p = self.players[pid]
             y = sy + rank * 44
-            pygame.draw.rect(self.screen, (*p.color, 40), (W//2-200, y, 400, 36), border_radius=6)
-            pygame.draw.rect(self.screen, (*p.color, 100), (W//2-200, y, 400, 36), 2, border_radius=6)
+            
+            # Use a temporary surface for transparency blending
+            row_surf = pygame.Surface((400, 36), pygame.SRCALPHA)
+            pygame.draw.rect(row_surf, (*p.color, 60), (0, 0, 400, 36), border_radius=6)
+            pygame.draw.rect(row_surf, (*p.color, 180), (0, 0, 400, 36), 2, border_radius=6)
+            self.screen.blit(row_surf, (W//2-200, y))
             
             kd_val = p.kills / max(1, p.deaths)
-            txt = FONT.render(f"#{rank+1}  {p.name:<10}  {p.kills} Kills / {p.deaths} Deaths   ({kd_val:.1f} K/D)", True, p.color)
+            txt = FONT.render(f"#{rank+1}  {p.name:<10}  {p.kills} K / {p.deaths} D  ({kd_val:.1f} K/D)", True, C["white"])
             self.screen.blit(txt, (W//2 - txt.get_width()//2, y + 8))
         
         for btn in self.gameover_buttons.values():
@@ -1826,7 +1832,16 @@ class Game:
                     self.running = False
 
             elif self.state == GameState.SETTINGS:
-                self.draw_settings_preview()
+                self.net.draw_settings_preview()
+                
+                # Cycling Time
+                time_btn = Button(W//2-110, 420, 220, 48, f"⏰ TIME: {self.time_options[self.time_idx]//60}m", (150, 100, 30))
+                if time_btn.update(mouse_pos, self.mouse_click):
+                    self.time_idx = (self.time_idx + 1) % len(self.time_options)
+                    self.game_time = self.time_options[self.time_idx] * FPS
+                    self.play_snd("pickup")
+                time_btn.draw(self.screen)
+
                 # Cycling button
                 btn_cycle = Button(W//2-110, 480, 220, 48, "🔄 CYCLE CLASS", (40, 100, 200))
                 if btn_cycle.update(mouse_pos, self.mouse_click):

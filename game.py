@@ -1,7 +1,7 @@
 """
 ╔══════════════════════════════════════════════════════════╗
 ║           MINI MILITIA CLONE — Python Edition            ║
-║         Local Multiplayer 2D Shooter (2-4 Players)      ║
+║         Local Multiplayer 2D Shooter (2-4 Players)       ║
 ╚══════════════════════════════════════════════════════════╝
 
 Requirements: pip install pygame
@@ -384,14 +384,23 @@ class WeaponPickup:
 #  HEALTH PACK
 # ─────────────────────────────────────────────
 class HealthPack:
-    def __init__(self, x, y):
+    def __init__(self, x, y, spawn_points=None):
         self.x, self.y = x, y
         self.rect = pygame.Rect(x-12, y-12, 24, 24)
         self.alive = True
         self.bob = 0
+        self.respawn_timer = 0
+        self.spawn_points = spawn_points if spawn_points else [(x, y)]
 
     def update(self):
         self.bob = math.sin(pygame.time.get_ticks() * 0.004) * 4
+        if not self.alive:
+            self.respawn_timer -= 1
+            if self.respawn_timer <= 0:
+                # Respawn at random spawn point
+                self.x, self.y = random.choice(self.spawn_points)
+                self.rect = pygame.Rect(self.x-12, self.y-12, 24, 24)
+                self.alive = True
 
     def draw(self, surf, cam_x, cam_y):
         if not self.alive: return
@@ -465,6 +474,15 @@ class Player:
         else:
             self.weapons[1] = dict(type=wtype, **WEAPONS[wtype])
             self.weapon_slot = 1
+
+    def pickup_health_kit(self):
+        needs_heal = self.hp < self.max_hp
+        needs_fuel = self.fuel < MAX_JETPACK_FUEL
+        if not needs_heal and not needs_fuel:
+            return False
+        self.hp = self.max_hp
+        self.fuel = MAX_JETPACK_FUEL
+        return True
 
     def switch_weapon(self):
         if len(self.weapons) > 1:
@@ -662,7 +680,7 @@ class Map:
         W, H = self.width, self.height
         self.platforms = [pygame.Rect(0, 680, W, 40)]
         if mid == 0:
-            self.platforms += [pygame.Rect(200, 560, 200, 20), pygame.Rect(500, 480, 160, 20), pygame.Rect(750, 560, 220, 20), pygame.Rect(1000, 440, 180, 20), pygame.Rect(1250, 520, 150, 20), pygame.Rect(1450, 460, 200, 20), pygame.Rect(1700, 540, 180, 20), pygame.Rect(1950, 480, 160, 20), pygame.Rect(2200, 560, 200, 20), pygame.Rect(2450, 440, 180, 20), pygame.Rect(2700, 520, 200, 20), pygame.Rect(2900, 460, 200, 20), pygame.Rect(400, 680, 60, -300), pygame.Rect(1100, 680, 60, -200), pygame.Rect(1800, 680, 60, -250), pygame.Rect(2500, 680, 60, -180), pygame.Rect(1540, 580, 120, 100), pygame.Rect(1560, 500, 80,  80), pygame.Rect(1580, 440, 40,  60)]
+            self.platforms += [pygame.Rect(200, 560, 200, 20), pygame.Rect(500, 480, 160, 20), pygame.Rect(750, 560, 220, 20), pygame.Rect(1000, 440, 180, 20), pygame.Rect(1250, 520, 150, 20), pygame.Rect(1450, 460, 200, 20), pygame.Rect(1700, 540, 180, 20), pygame.Rect(1950, 480, 160, 20), pygame.Rect(2200, 560, 200, 20), pygame.Rect(2450, 440, 180, 20), pygame.Rect(2700, 520, 200, 20), pygame.Rect(2900, 460, 200, 20), pygame.Rect(1540, 580, 120, 100), pygame.Rect(1560, 500, 80,  80), pygame.Rect(1580, 440, 40,  60)]
             self.spawn_points = [(100, 600),(200,600),(2900,600),(3000,600),(1500,400),(600,420)]
             self.weapon_spawns = [(400, 540, WeaponType.AK47), (1000, 400, WeaponType.SHOTGUN), (1580, 400, WeaponType.SNIPER), (2200, 520, WeaponType.ROCKET), (2700, 480, WeaponType.AK47)]
             self.health_spawns = [(700,540),(1300,490),(1800,510),(2400,420),(600,650)]
@@ -950,14 +968,27 @@ class NetworkManager:
                 'color': list(player.color)
             })
             self.last_sync = now
+            
+    def _draw_trophy_ui(self, surf, x, y, size=15):
+        # Premium Vector Trophy using pygame.draw
+        col = C["gold"]
+        # Cup shape
+        pygame.draw.polygon(surf, col, [(x, y), (x+size, y), (x+size*0.8, y+size*0.6), (x+size*0.2, y+size*0.6)])
+        # Handles
+        pygame.draw.arc(surf, col, (x-size*0.2, y, size*0.4, size*0.4), math.pi/2, 3*math.pi/2, 2)
+        pygame.draw.arc(surf, col, (x+size*0.8, y, size*0.4, size*0.4), -math.pi/2, math.pi/2, 2)
+        # Stem
+        pygame.draw.line(surf, col, (x+size//2, y+size*0.6), (x+size//2, y+size*0.9), 3)
+        # Base
+        pygame.draw.line(surf, col, (x+size*0.2, y+size*0.9), (x+size*0.8, y+size*0.9), 2)
 
     def draw_settings_preview(self):
         self.game.screen.fill(C["bg"])
         t = BIG_FONT.render("CHOOSE YOUR LOADOUT", True, C["white"])
         self.game.screen.blit(t, (W//2 - t.get_width()//2, 40))
         
-        cls = self.game.player_classes[self.game.player_class_id]
-        ct = FONT.render(f"CLASS: {cls['name']}", True, C["neon_green"])
+        cls = self.game.player_classes[self.game.player_class_ids[0]]
+        ct = FONT.render(f"P1 PREVIEW: {cls['name']}", True, C["neon_green"])
         self.game.screen.blit(ct, (W//2 - ct.get_width()//2, 100))
         
         # Weapon Previews
@@ -994,7 +1025,7 @@ class NetworkManager:
             self.game.screen.blit(hint, (W//2 - hint.get_width()//2, 220))
             
             # Start game if room ready (simplified)
-            play_btn = Button(W//2-110, 500, 220, 48, "🏁 START", (30, 150, 50))
+            play_btn = Button(W//2-110, 500, 220, 48, "PLAY NOW", (30, 150, 50))
             if play_btn.update(pygame.mouse.get_pos(), self.game.mouse_click):
                 self.game.start_game()
             play_btn.draw(self.game.screen)
@@ -1041,7 +1072,7 @@ class Game:
         self.cam_x = 0.0
         self.cam_y = 0.0
         self.active_players = []
-        self.player_class_id = 0
+        self.player_class_ids = [0, 0, 0, 0] # Individual classes for P1-P4
         self.player_classes = [
             {"name": "ASSAULT PACK", "weapons": [WeaponType.AK47, WeaponType.M4, WeaponType.XM8]},
             {"name": "SMG SURGE",    "weapons": [WeaponType.UZI, WeaponType.MP5, WeaponType.TEC9]},
@@ -1125,12 +1156,12 @@ class Game:
     def _build_menus(self):
         cx = W // 2
         self.menu_buttons = {
-            "play":     Button(cx-120, 250, 240, 52, "LOCAL PLAY", (30, 100, 200)),
-            "multi":    Button(cx-120, 318, 240, 52, "ONLINE",     (60, 40, 180)),
-            "map":      Button(cx-120, 386, 240, 52, "MAPS",       (40, 80, 140)),
-            "players":  Button(cx-120, 454, 240, 52, "PLAYERS",    (40, 80, 140)),
-            "settings": Button(cx-120, 522, 240, 52, "SETTINGS",   (30, 50, 80)),
-            "quit":     Button(cx-120, 590, 240, 52, "QUIT",        (100, 30, 30)),
+            "play":     Button(cx-120, 280, 240, 52, "LOCAL PLAY", (30, 100, 200)),
+            "multi":    Button(cx-120, 345, 240, 52, "ONLINE",     (60, 40, 180)),
+            "map":      Button(cx-120, 410, 240, 52, "MAPS",       (40, 80, 140)),
+            "players":  Button(cx-120, 475, 240, 52, f"PLAYERS: {self.num_players}", (40, 80, 140)),
+            "settings": Button(cx-120, 540, 240, 52, "SETTINGS",   (30, 50, 80)),
+            "quit":     Button(cx-120, 605, 240, 52, "QUIT",        (100, 30, 30)),
         }
         self.multi_buttons = {
             "create": Button(cx-110, 280, 220, 48, "CREATE ROOM", (30, 100, 50)),
@@ -1169,9 +1200,10 @@ class Game:
             sx, sy = self.game_map.get_spawn()
             sx += i * 60
             p = Player(i, sx, sy - 60, PLAYER_COLORS[i], PLAYER_NAMES[i])
-            # Load weapons from class
+            # Load weapons from individual player class
             p.weapons = []
-            for wt in self.player_classes[self.player_class_id]["weapons"]:
+            cid = self.player_class_ids[i]
+            for wt in self.player_classes[cid]["weapons"]:
                 p.weapons.append(dict(type=wt, **WEAPONS[wt]))
             p.weapon_slot = 0
             self.players[i] = p
@@ -1184,7 +1216,7 @@ class Game:
         # Health packs
         self.health_packs = []
         for (x, y) in self.game_map.health_spawns:
-            self.health_packs.append(HealthPack(x, y))
+            self.health_packs.append(HealthPack(x, y, self.game_map.health_spawns))
 
         self.state = GameState.PLAYING
 
@@ -1201,7 +1233,8 @@ class Game:
         p.invincible = 120
         # Start with selected class weapons
         p.weapons = []
-        for wt in self.player_classes[self.player_class_id]["weapons"]:
+        cid = self.player_class_ids[pid]
+        for wt in self.player_classes[cid]["weapons"]:
             p.weapons.append(dict(type=wt, **WEAPONS[wt]))
         p.weapon_slot = 0
         p.grenades = 3
@@ -1401,15 +1434,46 @@ class Game:
                             if p.respawn_timer <= 0: self.respawn_player(1)
 
             elif pid == 2:
-                # Player 3 — simplified (gamepad or TFGH)
-                if keys[pygame.K_t] and False: pass
-                if keys[pygame.K_h]: p.vx -= 1.4; p.facing = -1
-                if keys[pygame.K_j] and False: pass
-                # Very basic control for P3
+                # --- Player 3: IJKL ---
+                if keys[pygame.K_j]: p.vx -= 1.4; p.facing = -1
+                if keys[pygame.K_l]: p.vx += 1.4; p.facing = 1
+                p.using_jetpack = keys[pygame.K_i]
+                
+                # Aim via U / O
+                aim_dx = 0
+                if keys[pygame.K_u]: aim_dx = -1; p.facing = -1
+                if keys[pygame.K_o]: aim_dx = 1;  p.facing = 1
                 p.aim_angle = 0 if p.facing == 1 else math.pi
+                
+                # Shoot: P
+                if keys[pygame.K_p]: self.handle_shoot(2)
+                # Reload: N, Grenade: M, Switch: ,
+                if keys[pygame.K_n]: p.start_reload()
+                for ev in events:
+                    if ev.type == pygame.KEYDOWN:
+                        if ev.key == pygame.K_m: self.throw_grenade(2)
+                        if ev.key == pygame.K_COMMA: p.switch_weapon()
 
             elif pid == 3:
+                # --- Player 4: TFGH ---
+                if keys[pygame.K_f]: p.vx -= 1.4; p.facing = -1
+                if keys[pygame.K_h]: p.vx += 1.4; p.facing = 1
+                p.using_jetpack = keys[pygame.K_t]
+                
+                # Aim via R / Y
+                aim_dx = 0
+                if keys[pygame.K_r]: aim_dx = -1; p.facing = -1
+                if keys[pygame.K_y]: aim_dx = 1;  p.facing = 1
                 p.aim_angle = 0 if p.facing == 1 else math.pi
+                
+                # Shoot: V
+                if keys[pygame.K_v]: self.handle_shoot(3)
+                # Reload: X, Grenade: B, Switch: Z
+                if keys[pygame.K_x]: p.start_reload()
+                for ev in events:
+                    if ev.type == pygame.KEYDOWN:
+                        if ev.key == pygame.K_b: self.throw_grenade(3)
+                        if ev.key == pygame.K_z: p.switch_weapon()
 
         # Joystick support (P3, P4)
         for ji, joy in enumerate(self.joysticks[:2]):
@@ -1511,21 +1575,33 @@ class Game:
                 for pid in self.active_players:
                     p = self.players[pid]
                     if p.alive and p.rect.colliderect(hp.rect):
-                        p.hp = min(p.max_hp, p.hp + 40)
-                        p.shield = min(p.max_shield, p.shield + 20)
-                        hp.alive = False
+                        if p.pickup_health_kit():
+                            hp.alive = False
+                            hp.respawn_timer = 1350  # 15 seconds at 90 FPS
+                            break
 
         self.kill_feed.update()
         self.update_camera()
 
         # Win conditions
-        for pid in self.active_players:
-            if self.players[pid].kills >= self.score_limit:
-                self.winner = pid
-                self.state = GameState.GAME_OVER
-        if self.timer <= 0:
-            best = max(self.active_players, key=lambda pid: self.players[pid].kills)
-            self.winner = best
+        reached_limit = [pid for pid in self.active_players if self.players[pid].kills >= self.score_limit]
+        if reached_limit:
+            if len(reached_limit) > 1:
+                self.winner = "draw"  # Indicate a draw
+            else:
+                self.winner = reached_limit[0]
+            self.state = GameState.GAME_OVER
+        elif self.timer <= 0:
+            # Check for draw
+            kills_list = [self.players[pid].kills for pid in self.active_players]
+            max_kills = max(kills_list)
+            draw_players = [pid for pid in self.active_players if self.players[pid].kills == max_kills]
+            
+            if len(draw_players) > 1:
+                self.winner = "draw"  # Indicate a draw
+            else:
+                best = max(self.active_players, key=lambda pid: self.players[pid].kills)
+                self.winner = best
             self.state = GameState.GAME_OVER
 
     def draw_game(self):
@@ -1645,37 +1721,57 @@ class Game:
 
         # Title with neon glow
         off = math.sin(t * 1.5) * 6
+        title_y = 50
         for blur in range(4, 0, -1):
             ts = BIG_FONT.render("MINI MILITIA", True, (*PLAYER_COLORS[0], 50))
-            self.screen.blit(ts, (W//2 - ts.get_width()//2, 100 + off + blur*2))
+            self.screen.blit(ts, (W//2 - ts.get_width()//2, title_y + off + blur*2))
         
         title_surf = BIG_FONT.render("MINI MILITIA", True, C["white"])
-        self.screen.blit(title_surf, (W//2 - title_surf.get_width()//2, 100 + off))
+        self.screen.blit(title_surf, (W//2 - title_surf.get_width()//2, title_y + off))
         
         sub = FONT.render("Python Edition  •  Advanced Combat  •  Multiplayer Royale", True, C["mid_gray"])
-        self.screen.blit(sub, (W//2 - sub.get_width()//2, 168))
+        self.screen.blit(sub, (W//2 - sub.get_width()//2, title_y + 68))
         
         # Add decorative lines
-        pygame.draw.line(self.screen, (60, 90, 180, 100), (W//2 - 200, 195), (W//2 + 200, 195), 2)
+        pygame.draw.line(self.screen, (60, 90, 180, 100), (W//2 - 200, title_y + 95), (W//2 + 200, title_y + 95), 2)
 
         # Player count / map selector
-        info_x = W//2 - 60
         mname = self.map_names[self.map_id]
-        cname = self.player_classes[self.player_class_id]["name"]
-        ps = FONT.render(f"Players: {self.num_players}   Map: {mname}   Class: {cname}", True, (160, 200, 255))
-        self.screen.blit(ps, (W//2 - ps.get_width()//2, 220))
+        ps = FONT.render(f"Players: {self.num_players}   Map: {mname}", True, (160, 200, 255))
+        self.screen.blit(ps, (W//2 - ps.get_width()//2, title_y + 115))
 
-        # Visual Player List
+        # Visual Player List (And Interactive Class Cycle)
         px_start = W//2 - (self.num_players * 50)
+        mouse_pos = pygame.mouse.get_pos()
         for i in range(self.num_players):
             col = PLAYER_COLORS[i]
             x = px_start + i * 100
-            y = 260
+            y = 205
+            
+            # Invisible hit-box for class cycling
+            rect = pygame.Rect(x-10, y-40, 70, 90)
+            is_hover = rect.collidepoint(mouse_pos)
+            
+            # Glow behind icon (stronger if hover)
+            glow_surf = pygame.Surface((60, 60), pygame.SRCALPHA)
+            pygame.draw.circle(glow_surf, (*col, 80 if is_hover else 40), (30, 30), 25)
+            self.screen.blit(glow_surf, (x + 25 - 30, y - 30))
+            
+            # Click detection for class cycling
+            if is_hover and self.mouse_click:
+                self.player_class_ids[i] = (self.player_class_ids[i] + 1) % len(self.player_classes)
+                self.play_snd("pickup")
+            
             # Small player icon
-            pygame.draw.circle(self.screen, col, (x + 25, y), 12)
+            pygame.draw.circle(self.screen, col, (x + 25, y), 12 + (2 if is_hover else 0))
             pygame.draw.rect(self.screen, col, (x + 10, y + 5, 30, 20), border_radius=4)
             name_ts = TINY_FONT.render(PLAYER_NAMES[i], True, col)
             self.screen.blit(name_ts, (x + 25 - name_ts.get_width()//2, y + 30))
+            
+            # CLASS NAME SHOW
+            cname = self.player_classes[self.player_class_ids[i]]["name"]
+            cs = TINY_FONT.render(cname, True, (150, 180, 220) if is_hover else (100, 120, 160))
+            self.screen.blit(cs, (x + 25 - cs.get_width()//2, y + 42))
 
         for btn in self.menu_buttons.values():
             btn.draw(self.screen)
@@ -1707,25 +1803,75 @@ class Game:
         overlay.fill((10, 15, 30, 220))
         self.screen.blit(overlay, (0, 0))
         
-        t = BIG_FONT.render("BATTLE ENDED", True, C["white"])
-        self.screen.blit(t, (W//2 - t.get_width()//2, 100))
-        
-        # Show winner stats
-        sy = 200
+        # Highlight the Winner (Most Kills)
         sorted_pids = sorted(self.active_players, key=lambda pid: self.players[pid].kills, reverse=True)
+        max_kills = self.players[sorted_pids[0]].kills
+        draw_players = [pid for pid in self.active_players if self.players[pid].kills == max_kills]
+        is_draw = len(draw_players) > 1
+        
+        # Big Winner/Draw Announcement
+        if is_draw:
+            w_title = BIG_FONT.render("MATCH DRAW!", True, C["cyan"])
+            # Cyan Glow for draw
+            for off in range(1, 5):
+                glow = BIG_FONT.render("MATCH DRAW!", True, (40, 220, 220, 50))
+                self.screen.blit(glow, (W//2 - w_title.get_width()//2, 100 + off*2))
+            self.screen.blit(w_title, (W//2 - w_title.get_width()//2, 100))
+            sub_text = "TIE BETWEEN " + " & ".join([self.players[pid].name for pid in draw_players])
+        else:
+            winner_p = self.players[sorted_pids[0]]
+            w_title = BIG_FONT.render(f"{winner_p.name} WINS!", True, C["gold"])
+            # Gold Glow
+            for off in range(1, 5):
+                glow = BIG_FONT.render(f"{winner_p.name} WINS!", True, (150, 120, 0, 50))
+                self.screen.blit(glow, (W//2 - w_title.get_width()//2, 100 + off*2))
+            self.screen.blit(w_title, (W//2 - w_title.get_width()//2, 100))
+            sub_text = "MATCH ELITE PERFORMANCE"
+        
+        # Subtitle (No Emojis)
+        sub = FONT.render(sub_text, True, C["yellow"] if not is_draw else C["cyan"])
+        self.screen.blit(sub, (W//2 - sub.get_width()//2, 168))
+        if not is_draw:
+            self.net._draw_trophy_ui(self.screen, W//2 - sub.get_width()//2 - 25, 172)
+            self.net._draw_trophy_ui(self.screen, W//2 + sub.get_width()//2 + 8, 172)
+
+        # Leaderboard
+        sy = 230
         for rank, pid in enumerate(sorted_pids):
             p = self.players[pid]
-            y = sy + rank * 44
+            y = sy + rank * 48
+            is_winner = (rank == 0)
             
-            # Use a temporary surface for transparency blending
-            row_surf = pygame.Surface((400, 36), pygame.SRCALPHA)
-            pygame.draw.rect(row_surf, (*p.color, 60), (0, 0, 400, 36), border_radius=6)
-            pygame.draw.rect(row_surf, (*p.color, 180), (0, 0, 400, 36), 2, border_radius=6)
-            self.screen.blit(row_surf, (W//2-200, y))
+            # Row Background
+            row_w = 480 if is_winner else 420
+            row_x = W//2 - row_w//2
+            row_h = 42 if is_winner else 36
             
+            row_surf = pygame.Surface((row_w, row_h), pygame.SRCALPHA)
+            bg_alpha = 150 if is_winner else 80
+            pygame.draw.rect(row_surf, (*p.color, bg_alpha), (0, 0, row_w, row_h), border_radius=8)
+            border_col = C["gold"] if is_winner else (*p.color, 180)
+            pygame.draw.rect(row_surf, border_col, (0, 0, row_w, row_h), 2 if is_winner else 1, border_radius=8)
+            self.screen.blit(row_surf, (row_x, y))
+            
+            # KD and Stats
             kd_val = p.kills / max(1, p.deaths)
-            txt = FONT.render(f"#{rank+1}  {p.name:<10}  {p.kills} K / {p.deaths} D  ({kd_val:.1f} K/D)", True, C["white"])
-            self.screen.blit(txt, (W//2 - txt.get_width()//2, y + 8))
+            rank_str = f"#{rank+1}"
+            txt_col = C["white"] if is_winner else C["mid_gray"]
+            txt = FONT.render(f"{p.name:<10} | {p.kills} KILLS | {p.deaths} DEATHS | ({kd_val:.1f} K/D)", True, txt_col)
+            
+            center_y = y + (row_h//2 - txt.get_height()//2)
+            content_x = W//2 - txt.get_width()//2
+            
+            # Rank Number
+            rank_t = SMALL_FONT.render(rank_str, True, C["gold"] if is_winner else C["mid_gray"])
+            self.screen.blit(rank_t, (content_x - rank_t.get_width() - 20, center_y + 4))
+            
+            # Trophy if winner
+            if is_winner:
+                self.net._draw_trophy_ui(self.screen, content_x - rank_t.get_width() - 50, center_y + 4, 18)
+
+            self.screen.blit(txt, (content_x, center_y))
         
         for btn in self.gameover_buttons.values():
             btn.draw(self.screen)
@@ -1786,6 +1932,7 @@ class Game:
                 if self.menu_buttons["players"].update(mouse_pos, self.mouse_click):
                     self.num_players = (self.num_players % 4) + 1
                     if self.num_players < 2: self.num_players = 2
+                    self.menu_buttons["players"].text = f"PLAYERS: {self.num_players}"
                 if self.menu_buttons["map"].update(mouse_pos, self.mouse_click):
                     self.state = GameState.MAP_SELECT
                     self.play_snd("pickup")
@@ -1832,24 +1979,22 @@ class Game:
                     self.running = False
 
             elif self.state == GameState.SETTINGS:
+                self.screen.fill(C["bg"])
                 self.net.draw_settings_preview()
                 
-                # Cycling Time
-                time_btn = Button(W//2-110, 420, 220, 48, f"⏰ TIME: {self.time_options[self.time_idx]//60}m", (150, 100, 30))
+                # Still show global time settings
+                y_btns = 520
+                time_btn = Button(W//2-130, y_btns, 260, 48, f"TIME: {self.time_options[self.time_idx]//60} Minutes", (150, 100, 30))
                 if time_btn.update(mouse_pos, self.mouse_click):
                     self.time_idx = (self.time_idx + 1) % len(self.time_options)
                     self.game_time = self.time_options[self.time_idx] * FPS
                     self.play_snd("pickup")
                 time_btn.draw(self.screen)
 
-                # Cycling button
-                btn_cycle = Button(W//2-110, 480, 220, 48, "🔄 CYCLE CLASS", (40, 100, 200))
-                if btn_cycle.update(mouse_pos, self.mouse_click):
-                    self.player_class_id = (self.player_class_id + 1) % len(self.player_classes)
-                    self.play_snd("pickup")
-                btn_cycle.draw(self.screen)
+                hint_t = SMALL_FONT.render("TIP: Click Player Icons in Main Menu to switch their individual classes!", True, (160, 200, 255))
+                self.screen.blit(hint_t, (W//2 - hint_t.get_width()//2, y_btns + 60))
                 
-                btn_back = Button(W//2-110, 540, 220, 48, "↩  BACK", (100, 30, 30))
+                btn_back = Button(W//2-130, y_btns + 110, 260, 48, "BACK TO MENU", (100, 30, 30))
                 if btn_back.update(mouse_pos, self.mouse_click):
                     self.state = GameState.MAIN_MENU
                 btn_back.draw(self.screen)

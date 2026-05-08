@@ -1,18 +1,33 @@
-# 🎮 Multi-Militia — Python & Node.js Edition
+# 🎮 Multi-Militia: Python Edition
 
-A real-time multiplayer 2D shooter, built as a tribute to the classic Mini Militia. This project features high-intensity combat, jetpack mechanics, and support for both local and online multiplayer sessions.
+![Multi-Militia Header](./docs/images/header.png)
+
+**Multi-Militia** is a high-octane, 2D side-scrolling multiplayer shooter built as a modern tribute to the legendary *Mini Militia*. Experience intense combat with jetpack physics, a massive arsenal of weapons, and seamless local or online multiplayer action.
 
 ---
 
-## 🚀 Quick Start
+## ✨ Key Features
 
-### 1. Requirements
-- **Python 3.x**
-- **Node.js** (for the signaling server)
-- **Pygame** and **Python-SocketIO** libraries
+*   **🚀 Jetpack Combat**: Master the art of aerial warfare with gravity-defying jetpack mechanics.
+*   **🔫 Massive Arsenal**: Choose from over 15+ weapons including Assault Rifles (AK-47, M4), SMGs (Uzi, MP5), Snipers, Shotguns, and futuristic tech like the PHASR Laser and EMP Gun.
+*   **👥 Local & Online Multiplayer**: 
+    *   **Local**: Play with up to 4 players on a single machine using keyboard and gamepads.
+    *   **Online**: Connect with friends across the globe using a simple 4-digit room code system powered by Node.js and Socket.io.
+*   **🌍 Dynamic Maps**: Explore diverse battlegrounds with layered parallax backgrounds, strategic platforms, and interactive hazards.
+*   **📈 Tactical HUD**: Real-time tracking of Health, Shield, Fuel, and Ammo, plus a global Kill Feed and Scoreboard.
+*   **💥 High Fidelity**: Blood particles, smoke trails, muzzle flashes, and explosive effects for a premium combat experience.
 
-### 2. Installation
-First, install the necessary dependencies:
+---
+
+## 🛠️ Installation & Setup
+
+### 1. Prerequisites
+Ensure you have the following installed:
+- **Python 3.8+**
+- **Node.js** (for online multiplayer hosting)
+
+### 2. Install Dependencies
+Run the following commands in your terminal:
 
 ```bash
 # Install Python libraries
@@ -22,15 +37,19 @@ pip install pygame python-socketio requests
 npm install
 ```
 
-### 3. Running the Game
-To play the game, follow these steps in order:
+### 3. Launching the Game
+**For Online Mode:**
+1. Start the signaling server:
+   ```bash
+   node server.js
+   ```
+2. Launch the game client:
+   ```bash
+   python game.py
+   ```
 
-**A. Start the Server (for Online Mode):**
-```bash
-node server.js
-```
-
-**B. Launch the Client:**
+**For Local Play:**
+Simply run:
 ```bash
 python game.py
 ```
@@ -39,62 +58,45 @@ python game.py
 
 ## 🕹️ Controls
 
-### Player 1 (Mouse & Keyboard)
-*   **Move**: `A` / `D`
-*   **Jetpack**: `W` / `Space`
-*   **Aim**: Mouse Cursor
-*   **Shoot**: Left Click
-*   **Grenade**: `G`
-*   **Reload**: `R`
-*   **Switch Weapon**: `Q`
-*   **Respawn**: `Enter`
+Multi-Militia supports up to 4 players simultaneously.
 
-### Player 2 (Alternative Keyboard)
-*   **Move**: `Left` / `Right` Arrow Keys
-*   **Jetpack**: `Up` Arrow Key
-*   **Aim**: `I` / `J` / `K` / `L` Keys
-*   **Shoot**: `Numpad 0` / `Right Ctrl`
-*   **Grenade**: `Numpad .`
-*   **Reload**: `Numpad /`
-*   **Switch Weapon**: `Right Shift`
+| Action | Player 1 (KBM) | Player 2 (Keyboard) | Player 3 (Alt-KB) | Player 4 (Alt-KB) |
+| :--- | :--- | :--- | :--- | :--- |
+| **Move** | `A` / `D` | `←` / `→` | `J` / `L` | `F` / `H` |
+| **Jetpack** | `W` / `Space` | `↑` | `I` | `T` |
+| **Aim** | Mouse | `I` / `K` | `U` / `O` | `R` / `Y` |
+| **Shoot** | Left Click | `Numpad 0` | `P` | `V` |
+| **Grenade** | `G` | `Numpad .` | `M` | `B` |
+| **Reload** | `R` | `Numpad /` | `N` | `X` |
+| **Switch** | `Q` | `Right Shift` | `,` | `Z` |
 
 ---
 
-## 🏗️ Technical Architecture
+## 🔫 Weapons Selection
 
-The project consists of two main components:
+![Weapons](./docs/images/weapons.png)
 
-### 1. Client (`game.py`)
-Developed using **Pygame**, the client handles:
-- **Game Engine**: Physics (gravity, jetpack), collision detection, and character rendering.
-- **State Management**: Handling HUD, Timer, Scoreboard, and Kill Feed.
-- **Networking**: Using `python-socketio` to connect to the Node.js server for real-time synchronization.
-
-### 2. Server (`server.js`)
-Developed using **Node.js** and **Socket.io**, the server acts as a signaling orchestrator:
-- **Room Management**: Allows players to create and join private rooms using passcodes.
-- **Data Relay**: Forwards position, shooting, and damage events between players in the same room.
-- **Connection Handling**: Manages player IDs and cleanup upon disconnection.
+| Category | Weapons | Special Features |
+| :--- | :--- | :--- |
+| **Assault** | AK-47, M4, XM8 | Reliable, balanced damage and fire rate. |
+| **SMG** | Uzi, MP5, Tec-9 | High fire rate, Tec-9 features dual-wield. |
+| **Sniper** | Barrett | Long range, extreme damage, slow fire rate. |
+| **Shotgun** | Super 90 | High spread, devastating at close range. |
+| **Special** | Rocket, EMP, PHASR | Explosives, stunning shocks, and laser beams. |
+| **Handguns** | Magnum, Deagle | High precision, Deagle features dual-wield. |
 
 ---
 
-## 🛠️ Combat System
+## 🔧 Technical Overview
 
-- **Weapons**: Includes AK-47, M4, Sniper, Shotgun, Rocket Launcher, and futuristic weapons like PHASR.
-- **Dynamic Physics**: Every bullet has its own speed, spread, and travel physics.
-- **Hit Detection**: Accurate rectangle-to-point collision for player hits.
-- **Jetpack Fuel**: Limited fuel that recharges automatically while standing on the ground.
-- **Power-ups**: Collect Health Packs and Shields scattered across the map.
-
----
-
-## 📋 Features
-- [x] **Smooth Character Animations**: Walking, aiming, and jetpack particle effects.
-- [x] **Parallax Backgrounds**: Multi-layered backgrounds for enhanced depth.
-- [x] **Real-time Online Mode**: Play with friends using a simple 4-digit room code.
-- [x] **Full Kill Feed**: Tracks who killed whom and with what weapon.
-- [x] **Weapon Classes**: Multiple initial loadouts (Assault, SMG, Sniper, Special).
+- **Core Engine**: Built using `Pygame` for robust 2D physics and rendering.
+- **Networking**: `python-socketio` (Client) and `Socket.io` (Server) provide low-latency event relaying.
+- **State Management**: Dedicated systems for handling game cycles (Menu, Playing, Game Over, etc.).
+- **Map System**: procedurally defined platforms and spawns with multi-layered parallax background generation.
 
 ---
 
-Built with ❤️ by the Multi-Militia Development Team.
+## 📜 Credits
+Developed with passion by the **Multi-Militia Team**. Inspired by the classic Mini Militia experience.
+
+---
